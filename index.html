@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111418">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="疲労度">
+<title>疲労度記録</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='52'%3E%F0%9F%94%8B%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --fg:#14181d; --sub:#6b7480; --line:#e3e6ea;
+    --l1:#2e9e63; --l2:#78a93c; --l3:#d99b1f; --l4:#e2703a; --l5:#d8453f;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#111418; --card:#1a1f25; --fg:#eaeef3; --sub:#97a1ad; --line:#2b323a; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    padding:16px 14px calc(28px + env(safe-area-inset-bottom));
+    max-width:560px; margin:0 auto; -webkit-text-size-adjust:100%;
+  }
+  h1{font-size:17px;margin:0 0 2px}
+  .today{color:var(--sub);font-size:14px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:600}
+
+  .levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .lv{
+    -webkit-tap-highlight-color:transparent;
+    appearance:none;border:2px solid var(--line);background:var(--card);color:var(--fg);
+    border-radius:14px;padding:16px 0 10px;font-size:28px;font-weight:700;
+    cursor:pointer;line-height:1;transition:transform .08s;
+  }
+  .lv:active{transform:scale(.95)}
+  .lv small{display:block;font-size:10px;font-weight:500;color:var(--sub);margin-top:7px}
+  .lv[data-l="1"].on{background:var(--l1)} .lv[data-l="2"].on{background:var(--l2)}
+  .lv[data-l="3"].on{background:var(--l3)} .lv[data-l="4"].on{background:var(--l4)}
+  .lv[data-l="5"].on{background:var(--l5)}
+  .lv.on{color:#fff;border-color:transparent}
+  .lv.on small{color:rgba(255,255,255,.85)}
+
+  input[type=text]{
+    width:100%;margin-top:12px;padding:13px 12px;font-size:16px;
+    border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg)
+  }
+  .hint{font-size:12px;color:var(--sub);margin-top:8px}
+
+  ul{list-style:none;margin:0;padding:0}
+  li{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+  li:first-child{border-top:0}
+  .date{font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .badge{
+    flex:none;width:28px;height:28px;border-radius:9px;color:#fff;
+    font-size:14px;font-weight:700;display:grid;place-items:center
+  }
+  .memo{font-size:13px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .wd{display:grid;grid-template-columns:1.4em 1fr 4.6em;align-items:center;gap:8px;margin-bottom:7px;font-size:13px}
+  .track{background:var(--bg);border-radius:6px;height:16px;overflow:hidden}
+  .fill{display:block;height:100%;border-radius:6px;min-width:2px}
+  .num{text-align:right;color:var(--sub);font-variant-numeric:tabular-nums;font-size:12px}
+
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{
+    flex:1 1 46%;appearance:none;border:1px solid var(--line);background:var(--bg);color:var(--fg);
+    border-radius:12px;padding:13px 10px;font-size:14px;cursor:pointer;font-family:inherit
+  }
+  .btn:active{opacity:.6}
+  #file{display:none}
+  .empty{color:var(--sub);font-size:13px}
+  #toast{
+    position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);
+    background:#14181d;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.2s
+  }
+  #toast.show{opacity:.95;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<h1>疲労度記録</h1>
+<div class="today" id="todayLine"></div>
+
+<div class="card">
+  <h2>今日の疲労度</h2>
+  <div class="levels" id="levels">
+    <button class="lv" data-l="1">1<small>元気</small></button>
+    <button class="lv" data-l="2">2<small>軽い</small></button>
+    <button class="lv" data-l="3">3<small>普通</small></button>
+    <button class="lv" data-l="4">4<small>重い</small></button>
+    <button class="lv" data-l="5">5<small>限界</small></button>
+  </div>
+  <input type="text" id="memo" placeholder="一言メモ（任意）" maxlength="120" autocomplete="off">
+  <div class="hint">押した瞬間に保存。同じ日なら上書きされます。</div>
+</div>
+
+<div class="card">
+  <h2>曜日別の平均</h2>
+  <div id="wd"></div>
+</div>
+
+<div class="card">
+  <h2>記録</h2>
+  <ul id="list"></ul>
+</div>
+
+<div class="card">
+  <h2>データ</h2>
+  <div class="btns">
+    <button class="btn" id="copy">テキストでコピー</button>
+    <button class="btn" id="export">JSONを書き出す</button>
+    <button class="btn" id="importBtn">JSONを読み込む</button>
+  </div>
+  <input type="file" id="file" accept="application/json,.json">
+  <div class="hint">読み込みは同じ日付を上書き、ほかの記録は残します。</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  var KEY = 'fatigue-log-v1';
+  var WD = ['日','月','火','水','木','金','土'];
+  var COLORS = ['', '#2e9e63', '#78a93c', '#d99b1f', '#e2703a', '#d8453f'];
+
+  var $ = function(id){ return document.getElementById(id); };
+  var data = loadData();
+
+  function loadData(){
+    try{
+      var o = JSON.parse(localStorage.getItem(KEY));
+      return (o && typeof o === 'object') ? o : {};
+    }catch(e){ return {}; }
+  }
+  function saveData(){
+    try{ localStorage.setItem(KEY, JSON.stringify(data)); }
+    catch(e){ toast('保存できませんでした'); }
+  }
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function keyOf(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+  function wdOf(key){
+    var p = key.split('-');
+    return new Date(+p[0], +p[1]-1, +p[2]).getDay();
+  }
+  function label(key){ return key + '(' + WD[wdOf(key)] + ')'; }
+  function keysDesc(){ return Object.keys(data).sort().reverse(); }
+
+  var today = keyOf(new Date());
+
+  function toast(msg){
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ t.classList.remove('show'); }, 1500);
+  }
+
+  /* ---- 入力 ---- */
+  $('levels').addEventListener('click', function(e){
+    var b = e.target.closest('.lv');
+    if(!b) return;
+    var rec = data[today] || {};
+    rec.level = +b.dataset.l;
+    rec.memo = $('memo').value.trim();
+    data[today] = rec;
+    saveData();
+    render();
+    toast('保存しました（' + rec.level + '）');
+  });
+
+  var memoTimer;
+  $('memo').addEventListener('input', function(){
+    clearTimeout(memoTimer);
+    memoTimer = setTimeout(function(){
+      var rec = data[today] || { level:null };
+      rec.memo = $('memo').value.trim();
+      if(rec.level == null && !rec.memo){ delete data[today]; }
+      else { data[today] = rec; }
+      saveData();
+      renderList();
+    }, 400);
+  });
+
+  /* ---- 表示 ---- */
+  function render(){
+    var rec = data[today] || {};
+    $('todayLine').textContent = label(today) + (rec.level ? ' ・ 記録済み' : ' ・ まだ未記録');
+    var bs = document.querySelectorAll('.lv');
+    for(var i=0;i<bs.length;i++){
+      bs[i].classList.toggle('on', +bs[i].dataset.l === rec.level);
+    }
+    if(document.activeElement !== $('memo')) $('memo').value = rec.memo || '';
+    renderList();
+    renderWeekdays();
+  }
+
+  function renderList(){
+    var keys = keysDesc(), ul = $('list');
+    if(!keys.length){ ul.innerHTML = '<li class="empty">まだ記録がありません。</li>'; return; }
+    var html = '';
+    for(var i=0;i<keys.length;i++){
+      var k = keys[i], r = data[k];
+      var lv = r.level;
+      html += '<li>'
+        + '<span class="badge" style="background:' + (lv ? COLORS[lv] : 'var(--line)') + '">' + (lv || '–') + '</span>'
+        + '<span class="date">' + label(k) + '</span>'
+        + '<span class="memo">' + esc(r.memo || '') + '</span>'
+        + '</li>';
+    }
+    ul.innerHTML = html;
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+
+  function renderWeekdays(){
+    var sum = [0,0,0,0,0,0,0], cnt = [0,0,0,0,0,0,0];
+    var keys = Object.keys(data);
+    for(var i=0;i<keys.length;i++){
+      var r = data[keys[i]];
+      if(!r.level) continue;
+      var w = wdOf(keys[i]);
+      sum[w] += r.level; cnt[w]++;
+    }
+    var html = '';
+    for(var w=0; w<7; w++){
+      var avg = cnt[w] ? sum[w]/cnt[w] : 0;
+      var pct = avg ? (avg/5*100) : 0;
+      var color = avg ? COLORS[Math.max(1, Math.round(avg))] : 'transparent';
+      html += '<div class="wd">'
+        + '<span>' + WD[w] + '</span>'
+        + '<span class="track"><span class="fill" style="width:' + pct.toFixed(1) + '%;background:' + color + '"></span></span>'
+        + '<span class="num">' + (cnt[w] ? avg.toFixed(1) + ' / ' + cnt[w] + '件' : '-') + '</span>'
+        + '</div>';
+    }
+    $('wd').innerHTML = html;
+  }
+
+  /* ---- データ ---- */
+  function asText(){
+    var keys = Object.keys(data).sort(); // 古い順（時系列で分析しやすい）
+    return keys.map(function(k){
+      var r = data[k];
+      return (label(k) + ' ' + (r.level || '-') + ' ' + (r.memo || '')).trim();
+    }).join('\n');
+  }
+
+  $('copy').addEventListener('click', function(){
+    var text = asText();
+    if(!text){ toast('記録がありません'); return; }
+    var done = function(){ toast('コピーしました（' + Object.keys(data).length + '件）'); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ legacyCopy(text, done); });
+    } else { legacyCopy(text, done); }
+  });
+
+  function legacyCopy(text, done){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try{ ok = document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta);
+    ok ? done() : toast('コピーできませんでした');
+  }
+
+  $('export').addEventListener('click', function(){
+    var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'fatigue-' + today + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+    toast('書き出しました');
+  });
+
+  $('importBtn').addEventListener('click', function(){ $('file').click(); });
+
+  $('file').addEventListener('change', function(e){
+    var f = e.target.files[0];
+    if(!f) return;
+    var fr = new FileReader();
+    fr.onload = function(){
+      var o;
+      try{ o = JSON.parse(fr.result); }catch(err){ toast('JSONを読めませんでした'); return; }
+      if(!o || typeof o !== 'object' || Array.isArray(o)){ toast('形式が違います'); return; }
+      var n = 0;
+      for(var k in o){
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) continue;
+        var r = o[k];
+        if(!r || typeof r !== 'object') continue;
+        var lv = +r.level;
+        data[k] = {
+          level: (lv >= 1 && lv <= 5) ? lv : null,
+          memo: typeof r.memo === 'string' ? r.memo : ''
+        };
+        n++;
+      }
+      saveData();
+      render();
+      toast(n + '件を読み込みました');
+    };
+    fr.readAsText(f);
+    e.target.value = '';
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
